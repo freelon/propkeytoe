@@ -1,0 +1,55 @@
+= PropKeyToE - property-keys-to-enum-maven-plugin
+
+This is a simple maven plugin that generates enums for every property file you run it on.
+Its intent is to have compile-time checks on the keys of property files, similar to https://developer.android.com/guide/topics/resources/providing-resources#ResourcesFromCode[how Android Studio handles resource identifiers].
+You can, for instance, use it to access translations in resource bundles.
+
+== Usage
+
+Add this to your `pom.xml`
+[source,xml]
+
+----
+<plugin>
+    <groupId>de.torks</groupId>
+    <artifactId>property-keys-to-enum-maven-plugin</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>generate</goal>
+            </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+                <targetPackage>com.example.application.localization</targetPackage>
+                <!-- the file names in your resources folder, separated by comma, without extension -->
+                <resourceFiles>mail,view</resourceFiles>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>
+----
+
+In your `.../src/main/resources/` folder add `mail.properties`:
+[source,properties]
+
+----
+topic=Urgent Mail
+content.header=<h1>Behead me</h1>
+content.body= ....
+content.footer-without-images=Fee(d/t) me
+----
+
+This will give you a generated file `com.example.application.localization.Mail` which you can use to name your translation keys with a compiler-checked enum.
+[source,java]
+
+----
+import com.example.application.localization.Mail;
+
+EMail sendMail(Locale locale) {
+    return new EMail()
+            .topic(Translations.get(locale, Mail.TOPIC))
+            .contentHeader(Translations.get(locale, Mail.CONTENT_HEADER))
+            .receiver( ... );
+}
+----
