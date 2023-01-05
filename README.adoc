@@ -23,7 +23,16 @@ Add this to your `pom.xml`
             <configuration>
                 <targetPackage>com.example.application.localization</targetPackage>
                 <!-- the file names in your resources folder, separated by comma, without extension -->
-                <resourceFiles>mail,view</resourceFiles>
+                <resourceFiles>
+                    <resourceFile>
+                        <file>mail</file>
+                        <enumValueContent>KEY</enumValueContent>
+                    </resourceFile>
+                    <resourceFile>
+                        <file>mail</file>
+                        <enumValueContent>VALUE</enumValueContent>
+                    </resourceFile>
+                </resourceFiles>
             </configuration>
         </execution>
     </executions>
@@ -53,3 +62,8 @@ EMail sendMail(Locale locale) {
             .receiver( ... );
 }
 ----
+
+== Configuration
+
+The `<enumValueContent>` tag can be either `KEY` (default) or `VALUE`.
+The `getValue()` method of the generated enum will then return either the property key or value.

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.codehaus.plexus.util.PropertyUtils.loadProperties;
@@ -25,7 +26,7 @@ public class PropKeyToE extends AbstractMojo {
     MavenProject project;
 
     @Parameter(property = "resourceFiles", readonly = true, required = true)
-    String resourceFiles;
+    List<Resource> resourceFiles;
 
     @Parameter(property = "targetPackage", readonly = true)
     String targetPackage;
@@ -38,13 +39,14 @@ public class PropKeyToE extends AbstractMojo {
             targetPackage = "";
         prepareTargetPath();
 
-        for (String resource : resourceFiles.split(",")) {
+        for (Resource resource : resourceFiles) {
             getLog().debug(String.format("starting with bundle '%s'", resource));
 
-            File resourceFile = new File(project.getBasedir().getAbsolutePath() + "/src/main/resources/" + resource + ".properties");
+            File resourceFile = new File(project.getBasedir().getAbsolutePath() + "/src/main/resources/" + resource.getFilename() + ".properties");
 
-            List<String> keys = getKeys(resourceFile);
-            createEnum(resource, keys);
+            List<Entry> entries = getKeys(resourceFile);
+            createEnum(resource, entries);
+            getLog().info(String.format("Created enum '%s'", createEnumName(resource.getFilename())));
         }
     }
 
@@ -56,9 +58,9 @@ public class PropKeyToE extends AbstractMojo {
         targetDirectory = file.toPath();
     }
 
-    private void createEnum(String resource, List<String> keys) throws MojoFailureException {
-        String enumName = createEnumName(resource);
-        String fileContent = createFileContent(enumName, keys);
+    private void createEnum(Resource resource, List<Entry> entries) throws MojoFailureException {
+        String enumName = createEnumName(resource.getFilename());
+        String fileContent = createFileContent(enumName, entries, resource.getEnumValueContent());
         createFile(enumName, fileContent);
     }
 
@@ -66,34 +68,45 @@ public class PropKeyToE extends AbstractMojo {
         return resource.substring(0, 1).toUpperCase() + resource.substring(1);
     }
 
-    private String createFileContent(String enumName, List<String> keys) {
+    private String createFileContent(String enumName, List<Entry> entries, Resource.EnumValueContent enumValueContent) {
         StringBuilder builder = new StringBuilder();
         if (!targetPackage.isEmpty()) {
             builder.append("package ").append(targetPackage).append(";").append("\n")
                     .append("\n");
         }
         builder.append("public enum ").append(enumName).append(" {").append("\n");
-        for (int i = 0; i < keys.size(); i++) {
-            String key = keys.get(i);
-            boolean lastEntry = i == keys.size() - 1;
+        for (int i = 0; i < entries.size(); i++) {
+            Entry entry = entries.get(i);
+            boolean lastEntry = i == entries.size() - 1;
 
-            String enumEntryName = createEnumEntryName(key);
+            String enumEntryName = createEnumEntryName(entry.key);
+            String content;
+            switch (enumValueContent) {
+                case KEY:
+                    content = entry.key;
+                    break;
+                case VALUE:
+                    content = entry.value;
+                    break;
+                default:
+                    throw new IllegalStateException("'enumValueContent' must not be null");
+            }
             builder.append("    ")
                     .append(enumEntryName)
-                    .append("(\"").append(key).append("\")");
+                    .append("(\"").append(content).append("\")");
             if (lastEntry)
                 builder.append(";");
             else
                 builder.append(",");
             builder.append("\n");
         }
-        builder.append("    private final String key;").append("\n")
-                .append("\n").append("    ").append(enumName).append("(String key) {").append("\n")
-                .append("        this.key = key;").append("\n")
+        builder.append("    private final String value;").append("\n")
+                .append("\n").append("    ").append(enumName).append("(String value) {").append("\n")
+                .append("        this.value = value;").append("\n")
                 .append("    }").append("\n")
                 .append("\n")
-                .append("    public String getKey() {").append("\n")
-                .append("        return key;").append("\n")
+                .append("    public String getValue() {").append("\n")
+                .append("        return value;").append("\n")
                 .append("    }").append("\n")
                 .append("}").append("\n");
 
@@ -129,15 +142,25 @@ public class PropKeyToE extends AbstractMojo {
         }
     }
 
-    List<String> getKeys(File resourceFile) throws MojoFailureException {
+    List<Entry> getKeys(File resourceFile) throws MojoFailureException {
         try {
             Properties properties = loadProperties(resourceFile);
-            List<String> result = new ArrayList<>();
-            for (Object key : properties.keySet())
-                result.add(key.toString());
+            List<Entry> result = new ArrayList<>();
+            for (Map.Entry<Object, Object> entry : properties.entrySet())
+                result.add(new Entry(entry.getKey().toString(), entry.getValue().toString()));
             return result;
         } catch (IOException e) {
             throw new MojoFailureException("Failed to load properties", e);
+        }
+    }
+
+    static class Entry {
+        final String key;
+        final String value;
+
+        public Entry(String key, String value) {
+            this.key = key;
+            this.value = value;
         }
     }
 }
